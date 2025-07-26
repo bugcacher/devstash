@@ -2,6 +2,8 @@
 
 This directory contains the n8n workflow template for the DevStash ecosystem. The workflow uses AI-powered processing to intelligently analyze and store code snippets directly in Algolia.
 
+<img width="1260" height="466" alt="Screenshot 2025-07-27 at 1 12 29 AM" src="https://github.com/user-attachments/assets/f17c0a7f-0e08-461b-a2c8-aefc7b3054d9" />
+
 ## Workflow Overview
 
 The workflow performs the following operations:
