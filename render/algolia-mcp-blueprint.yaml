@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: your-algolia-mcp-server-name # Make it unique by adding an uuid in name
+    runtime: go
+    repo: https://github.com/algolia/mcp
+    plan: free
+    envVars:
+      - key: MCP_SERVER_TYPE
+        sync: false
+      - key: MCP_ENABLED_TOOLS
+        sync: false
+      - key: ALGOLIA_WRITE_API_KEY
+        sync: false
+      - key: ALGOLIA_INDEX_NAME
+        sync: false
+      - key: ALGOLIA_APP_ID
+        sync: false
+      - key: ALGOLIA_API_KEY
+        sync: false
+    region: oregon
+    buildCommand: go build -tags netgo -ldflags '-s -w' -o app
+    startCommand: ./app
+    autoDeployTrigger: "off"
+    rootDir: cmd/mcp
+version: "1"
