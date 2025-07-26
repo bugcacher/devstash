@@ -1,0 +1,685 @@
+{
+    "name": "Devstash",
+    "nodes": [
+        {
+            "parameters": {
+                "jsCode": "// Get the output from the 'Webhook' node.\nconst webhookData = $('Webhook').first().json.body\n\n// Get the output from the 'Information Extractor' node.\nconst llmData = $input.first().json.output\n\n// Start building the final object with required fields from the webhook\nconst finalItem = {\n  objectID: webhookData.id,\n  content: webhookData.content,\n  createdAt: webhookData.createdAt,\n};\n\n// Add fields from the LLM output\nfinalItem.title = llmData.title;\nfinalItem.type = llmData.type;\nfinalItem.language = llmData.language;\n\n// Handle the 'note' field: use webhook's note if it exists, otherwise use LLM's\nfinalItem.note = webhookData.note || llmData.note;\n\n// Handle 'tags': combine userTags from webhook and tags from LLM\nconst userTags = webhookData.userTags || [];\nconst llmTags = llmData.tags || [];\n\n// Use a Set to combine and automatically remove duplicates, then convert back to an array\nconst combinedTags = [...new Set([...userTags, ...llmTags])];\nfinalItem.tags = combinedTags;\n\n// The Code node should return an object with a 'json' property\n// containing the data for the next node.\nreturn {\n  output: finalItem,\n};"
+            },
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                -416,
+                192
+            ],
+            "id": "94706792-56ef-41aa-b99c-155b3d363600",
+            "name": "Code"
+        },
+        {
+            "parameters": {
+                "multipleMethods": true,
+                "httpMethod": [
+                    "POST",
+                    "DELETE"
+                ],
+                "path": "/stash",
+                "authentication": "headerAuth",
+                "options": {
+                    "allowedOrigins": "*"
+                }
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                -1264,
+                544
+            ],
+            "id": "1c20e393-128c-4a7f-855b-2f51f63e913e",
+            "name": "Webhook",
+            "webhookId": "5a86351e-8ee1-4020-a8a9-651fa146e33b",
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "HByfBV8K3EflYQTP",
+                    "name": "Devstash Webhook Auth"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "=Insert the following object into Algolia index`{{$json.ALGOLIA_INDEX_NAME || 'stashes'}}`:\n\n{{ JSON.stringify($json.output) }}\n\nIf the index is not present create an index first with name `{{$json.ALGOLIA_INDEX_NAME || 'stashes'}}` and then retry the insert operation again.\n\nReturn {\"result\": true} if insert operation was successful, {\"result\": false} if insert operation failed.",
+                "hasOutputParser": true,
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 2.1,
+            "position": [
+                -48,
+                192
+            ],
+            "id": "8594aa82-07cd-4ad3-882a-e7878b42b22f",
+            "name": "Insert Agent"
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "=Task: Remove this document from the Algolia index `{{$json.ALGOLIA_INDEX_NAME || 'stashes'}}`. \nObject ID to delete: {{ $json.body.objectId }}.\n\nReturn {\"result\": true} if successful, {\"result\": false} if failed.\n\n",
+                "hasOutputParser": true,
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 2.1,
+            "position": [
+                -720,
+                864
+            ],
+            "id": "30c3fb65-ef24-46e6-81f7-4db39d28e1b0",
+            "name": "Delete Agent"
+        },
+        {
+            "parameters": {
+                "sseEndpoint": "=https://your-aloglia-server.onrender.com/sse"
+            },
+            "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+            "typeVersion": 1,
+            "position": [
+                80,
+                464
+            ],
+            "id": "c63d160e-82cc-4af5-bd3f-b24c3f997058",
+            "name": "MCP Client"
+        },
+        {
+            "parameters": {
+                "schemaType": "manual",
+                "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"result\": {\n\t\t\t\"type\": \"boolean\",\n\t\t\t\"description\": \"Indicates whether the operation was successful\"\n\t\t}\n\t},\n\t\"required\": [\n\t\t\"result\"\n\t]\n}"
+            },
+            "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+            "typeVersion": 1.3,
+            "position": [
+                -464,
+                1088
+            ],
+            "id": "cddf4230-89a8-4d5d-b121-1279a5f87901",
+            "name": "Delete Op Result Parser"
+        },
+        {
+            "parameters": {
+                "schemaType": "manual",
+                "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"result\": {\n\t\t\t\"type\": \"boolean\",\n\t\t\t\"description\": \"Indicates whether the operation was successful\"\n\t\t},\n      \"objectId\": {\n        \"type\": \"string\",\n        \"description\": \"Id of the inserted document\"\n      }\n\t},\n\t\"required\": [\n\t\t\"result\"\n\t]\n}"
+            },
+            "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+            "typeVersion": 1.3,
+            "position": [
+                192,
+                368
+            ],
+            "id": "8e7ce8ea-7654-4a09-97cd-38fed77a012e",
+            "name": "Insert Op Result Parser"
+        },
+        {
+            "parameters": {
+                "text": "=Based on the provided JSON data, please perform the following tasks:\n1.  Generate a concise, descriptive 'title' for the content.\n2.  Classify the 'type' of the content as one of the following: 'code', 'command', 'query', 'config', 'note', or 'other'.\n3.  Analyze the 'content' to identify the programming 'language'. If it's different from the language provided in the data, use your corrected version.\n4.  Generate a list of relevant 'tags' as a JSON array of strings. Do not use the tags from the 'userTags' field in the input data.\n{{ $json.note ? \"5. A 'note' is already provided, so return it as is.\" : \"5. A 'note' is not provided. Please generate a brief, one-sentence summary of the content to use as a 'note'.\" }}\n\nProvide the output as a single, valid JSON object containing only these fields: title, type, language, tags, and note.\n\nInput Data:\n{{ JSON.stringify($json.body) }}",
+                "schemaType": "manual",
+                "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"title\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"type\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"enum\": [\n\t\t\t\t\"code\",\n\t\t\t\t\"command\",\n\t\t\t\t\"query\",\n\t\t\t\t\"config\",\n\t\t\t\t\"snippet\",\n\t\t\t\t\"note\",\n\t\t\t\t\"other\"\n\t\t\t]\n\t\t},\n\t\t\"language\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"tags\": {\n\t\t\t\"type\": \"array\",\n\t\t\t\"items\": {\n\t\t\t\t\"type\": \"string\"\n\t\t\t}\n\t\t},\n\t\t\"note\": {\n\t\t\t\"type\": \"string\"\n\t\t}\n\t}\n}",
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+            "typeVersion": 1.2,
+            "position": [
+                -816,
+                192
+            ],
+            "id": "aeeb3986-1138-4fa8-93d1-b0eb54df3e72",
+            "name": "Information Extractor"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "id": "e68a15a7-c65c-479f-ab23-3a208c50b6a8",
+                            "leftValue": "={{ $json.output.result }}",
+                            "rightValue": "",
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                464,
+                192
+            ],
+            "id": "77f8be4c-2837-441d-a07a-684c4f45e6e5",
+            "name": "If"
+        },
+        {
+            "parameters": {
+                "errorMessage": "Failed to insert!!"
+            },
+            "type": "n8n-nodes-base.stopAndError",
+            "typeVersion": 1,
+            "position": [
+                720,
+                288
+            ],
+            "id": "9579a25b-931d-4210-99db-073a0c7d86a0",
+            "name": "Stop and Error"
+        },
+        {
+            "parameters": {},
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                720,
+                128
+            ],
+            "id": "b0ca8de8-0b19-4609-bf2c-324fd84a53b6",
+            "name": "No Operation, do nothing"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "id": "e68a15a7-c65c-479f-ab23-3a208c50b6a8",
+                            "leftValue": "={{ $json.output.result }}",
+                            "rightValue": "",
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                0,
+                864
+            ],
+            "id": "097add21-3012-4baa-a204-11f0de65686c",
+            "name": "If1"
+        },
+        {
+            "parameters": {},
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                240,
+                752
+            ],
+            "id": "8e6e0a9c-c410-424b-8e36-cafb42f13f55",
+            "name": "No Operation, do nothing1"
+        },
+        {
+            "parameters": {
+                "errorMessage": "Failed to insert!!"
+            },
+            "type": "n8n-nodes-base.stopAndError",
+            "typeVersion": 1,
+            "position": [
+                240,
+                960
+            ],
+            "id": "8a7eddc3-dfbf-4904-b00b-8eddb1dadd88",
+            "name": "Stop and Error1"
+        },
+        {
+            "parameters": {
+                "model": "openrouter/auto",
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+            "typeVersion": 1,
+            "position": [
+                -816,
+                368
+            ],
+            "id": "81bd37be-e25e-4817-89f3-c514984158a9",
+            "name": "OpenRouter Extractor Model",
+            "credentials": {
+                "openRouterApi": {
+                    "id": "rmNQ4AKEUVzOlaJT",
+                    "name": "OpenRouter Account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "model": "google/gemini-2.0-flash-001",
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+            "typeVersion": 1,
+            "position": [
+                -48,
+                368
+            ],
+            "id": "130e17ec-05ca-4a59-a6a9-4756a00d5d1b",
+            "name": "OpenRouter  Model 1",
+            "credentials": {
+                "openRouterApi": {
+                    "id": "UEu6Xyts6n8Ao9pw",
+                    "name": "OpenRouter Private"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "model": "google/gemini-2.0-flash-001",
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+            "typeVersion": 1,
+            "position": [
+                -720,
+                1088
+            ],
+            "id": "a8702785-c026-4f6a-96f1-2f7c07b7fe3d",
+            "name": "OpenRouter Model 2",
+            "credentials": {
+                "openRouterApi": {
+                    "id": "UEu6Xyts6n8Ao9pw",
+                    "name": "OpenRouter Private"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "content": "## Data Processing & Field Extraction\nTakes webhook data and uses LLM to extract structured fields (title, type, language, tags, note) from the content. Code node then combines original webhook data with LLM-provided metadata to create complete structured dataset for processing.",
+                "height": 544,
+                "width": 784
+            },
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [
+                -976,
+                48
+            ],
+            "id": "10d8233e-637e-4b27-a5ec-26099124a82f",
+            "name": "Sticky Note"
+        },
+        {
+            "parameters": {
+                "content": "## Algolia Data Insertion\nTakes structured metadata from Workflow 1 and uses AI agent to call Algolia MCP server for index insertion. Returns true/false based on operation success - completes workflow on success or throws error on failure.",
+                "height": 544,
+                "width": 1040
+            },
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [
+                -96,
+                48
+            ],
+            "id": "90419312-29e5-414a-847f-0da2e2906d1f",
+            "name": "Sticky Note1"
+        },
+        {
+            "parameters": {
+                "content": "## Algolia Data Deletion\nHandles DELETE webhook requests by extracting object ID and passing it to AI agent. Agent calls Algolia MCP server to delete the specified object from the index.",
+                "height": 608,
+                "width": 1920
+            },
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [
+                -976,
+                656
+            ],
+            "id": "d9266b0f-a13a-43e2-9b88-96b126e38ea8",
+            "name": "Sticky Note2"
+        },
+        {
+            "parameters": {
+                "sseEndpoint": "https://your-aloglia-server.onrender.com/sse"
+            },
+            "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+            "typeVersion": 1,
+            "position": [
+                -592,
+                1088
+            ],
+            "id": "e004097b-2cbe-4519-94de-8397f3f34c2f",
+            "name": "MCP Client1"
+        },
+        {
+            "parameters": {
+                "mode": "raw",
+                "jsonOutput": "{\n  \"ALGOLIA_INDEX_NAME\": \"\"\n}\n",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                -1840,
+                576
+            ],
+            "id": "2d3e3555-4b2a-4ad6-bf10-829678d22b19",
+            "name": "Workflow Variables"
+        },
+        {
+            "parameters": {
+                "content": "## Workflow Variables \nUse this node to set variables within the workflow as global variables are only available on Paid Plans.",
+                "height": 336,
+                "width": 432,
+                "color": 3
+            },
+            "type": "n8n-nodes-base.stickyNote",
+            "position": [
+                -1968,
+                448
+            ],
+            "typeVersion": 1,
+            "id": "706e5479-d85d-4a33-a9e0-c746b063d099",
+            "name": "Sticky Note3"
+        },
+        {
+            "parameters": {
+                "content": "## Entry Point",
+                "height": 224,
+                "width": 288,
+                "color": 4
+            },
+            "type": "n8n-nodes-base.stickyNote",
+            "position": [
+                -1296,
+                480
+            ],
+            "typeVersion": 1,
+            "id": "3f6c72fc-54a3-4873-abb3-36b0a92bf1f3",
+            "name": "Sticky Note4"
+        }
+    ],
+    "pinData": {
+        "Information Extractor": [
+            {
+                "json": {
+                    "output": {
+                        "title": "Export Kubernetes Deployment to YAML",
+                        "type": "command",
+                        "language": "shell",
+                        "tags": [
+                            "kubernetes",
+                            "kubectl",
+                            "deployment",
+                            "yaml",
+                            "cli"
+                        ],
+                        "note": "Exports the YAML configuration of the 'my-ServiceWorker' deployment to a file named myservice.yaml using kubectl."
+                    }
+                }
+            }
+        ],
+        "Code": [
+            {
+                "json": {
+                    "output": {
+                        "objectID": "4fc58ffa-6aca-4c71-8d54-70ccb854d49a",
+                        "content": "kubectl get deployment my-ServiceWorker -o yaml > myservice.yaml",
+                        "createdAt": "2025-07-24T19:54:56.223Z",
+                        "title": "Export Kubernetes Deployment to YAML",
+                        "type": "command",
+                        "language": "shell",
+                        "note": "Exports the YAML configuration of the 'my-ServiceWorker' deployment to a file named myservice.yaml using kubectl.",
+                        "tags": [
+                            "kubernetes",
+                            "kubectl",
+                            "deployment",
+                            "yaml",
+                            "cli"
+                        ]
+                    }
+                }
+            }
+        ],
+        "Insert Agent": [
+            {
+                "json": {
+                    "output": {
+                        "result": true,
+                        "objectId": "4fc58ffa-6aca-4c71-8d54-70ccb854d49a"
+                    }
+                }
+            }
+        ],
+        "Delete Agent": [
+            {
+                "json": {
+                    "output": {
+                        "result": true
+                    }
+                }
+            }
+        ]
+    },
+    "connections": {
+        "Code": {
+            "main": [
+                [
+                    {
+                        "node": "Insert Agent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Information Extractor",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Delete Agent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Insert Agent": {
+            "main": [
+                [
+                    {
+                        "node": "If",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "MCP Client": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "Insert Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Delete Op Result Parser": {
+            "ai_outputParser": [
+                [
+                    {
+                        "node": "Delete Agent",
+                        "type": "ai_outputParser",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Insert Op Result Parser": {
+            "ai_outputParser": [
+                [
+                    {
+                        "node": "Insert Agent",
+                        "type": "ai_outputParser",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Information Extractor": {
+            "main": [
+                [
+                    {
+                        "node": "Code",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "If": {
+            "main": [
+                [
+                    {
+                        "node": "No Operation, do nothing",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Stop and Error",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "If1": {
+            "main": [
+                [
+                    {
+                        "node": "No Operation, do nothing1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Stop and Error1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Delete Agent": {
+            "main": [
+                [
+                    {
+                        "node": "If1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenRouter Extractor Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "Information Extractor",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenRouter  Model 1": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "Insert Agent",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenRouter Model 2": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "Delete Agent",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "MCP Client1": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "Delete Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Workflow Variables": {
+            "main": [
+                [
+                    {
+                        "node": "Information Extractor",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Delete Agent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1",
+        "timezone": "Asia/Kolkata",
+        "callerPolicy": "workflowsFromSameOwner"
+    },
+    "versionId": "00c4c936-16b7-4f5a-af6d-cc7cef1b2ac8",
+    "meta": {
+        "templateCredsSetupCompleted": true,
+        "instanceId": "7ae0f048f3c691858c5ecb6af492b284818dd71f66163ae8056a2e0909a6934b"
+    },
+    "id": "YeyjjpXDBOKIWqxa",
+    "tags": []
+}
