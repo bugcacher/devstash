@@ -30,8 +30,8 @@
             "type": "n8n-nodes-base.webhook",
             "typeVersion": 2,
             "position": [
-                -1264,
-                544
+                -2304,
+                560
             ],
             "id": "1c20e393-128c-4a7f-855b-2f51f63e913e",
             "name": "Webhook",
@@ -46,7 +46,7 @@
         {
             "parameters": {
                 "promptType": "define",
-                "text": "=Insert the following object into Algolia index`{{$json.ALGOLIA_INDEX_NAME || 'stashes'}}`:\n\n{{ JSON.stringify($json.output) }}\n\nIf the index is not present create an index first with name `{{$json.ALGOLIA_INDEX_NAME || 'stashes'}}` and then retry the insert operation again.\n\nReturn {\"result\": true} if insert operation was successful, {\"result\": false} if insert operation failed.",
+                "text": "=Insert the following object into Algolia index `{{$('Workflow Variables').item.json.ALGOLIA_INDEX_NAME || 'stashes'}}`:\n\n{{ JSON.stringify($json.output) }}\n\nIf the index is not present create an index first with name `{{$('Workflow Variables').item.json.ALGOLIA_INDEX_NAME || 'stashes'}}` and then retry the insert operation again.",
                 "hasOutputParser": true,
                 "options": {}
             },
@@ -62,7 +62,7 @@
         {
             "parameters": {
                 "promptType": "define",
-                "text": "=Task: Remove this document from the Algolia index `{{$json.ALGOLIA_INDEX_NAME || 'stashes'}}`. \nObject ID to delete: {{ $json.body.objectId }}.\n\nReturn {\"result\": true} if successful, {\"result\": false} if failed.\n\n",
+                "text": "=Task: Remove this document from the Algolia index `{{$('Workflow Variables').item.json.ALGOLIA_INDEX_NAME || 'stashes'}}`. \nObject ID to delete: {{ $('Webhook').item.json.body.objectId }}\n",
                 "hasOutputParser": true,
                 "options": {}
             },
@@ -118,7 +118,7 @@
         },
         {
             "parameters": {
-                "text": "=Based on the provided JSON data, please perform the following tasks:\n1.  Generate a concise, descriptive 'title' for the content.\n2.  Classify the 'type' of the content as one of the following: 'code', 'command', 'query', 'config', 'note', or 'other'.\n3.  Analyze the 'content' to identify the programming 'language'. If it's different from the language provided in the data, use your corrected version.\n4.  Generate a list of relevant 'tags' as a JSON array of strings. Do not use the tags from the 'userTags' field in the input data.\n{{ $json.note ? \"5. A 'note' is already provided, so return it as is.\" : \"5. A 'note' is not provided. Please generate a brief, one-sentence summary of the content to use as a 'note'.\" }}\n\nProvide the output as a single, valid JSON object containing only these fields: title, type, language, tags, and note.\n\nInput Data:\n{{ JSON.stringify($json.body) }}",
+                "text": "=Based on the provided JSON data, please perform the following tasks:\n1.  Generate a concise, descriptive 'title' for the content.\n2.  Classify the 'type' of the content as one of the following: 'code', 'command', 'query', 'config', 'note', or 'other'.\n3.  Analyze the 'content' to identify the programming 'language'. If it's different from the language provided in the data, use your corrected version.\n4.  Generate a list of relevant 'tags' as a JSON array of strings. Do not use the tags from the 'userTags' field in the input data.\n{{ $('Webhook').item.json.body.note ? \"5. A 'note' is already provided, so return it as is.\" : \"5. A 'note' is not provided. Please generate a brief, one-sentence summary of the content to use as a 'note'.\" }}\nProvide the output as a single, valid JSON object containing only these fields: title, type, language, tags, and note.\n\nInput Data:\n{{ JSON.stringify($('Webhook').item.json.body ) }}",
                 "schemaType": "manual",
                 "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"title\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"type\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"enum\": [\n\t\t\t\t\"code\",\n\t\t\t\t\"command\",\n\t\t\t\t\"query\",\n\t\t\t\t\"config\",\n\t\t\t\t\"snippet\",\n\t\t\t\t\"note\",\n\t\t\t\t\"other\"\n\t\t\t]\n\t\t},\n\t\t\"language\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"tags\": {\n\t\t\t\"type\": \"array\",\n\t\t\t\"items\": {\n\t\t\t\t\"type\": \"string\"\n\t\t\t}\n\t\t},\n\t\t\"note\": {\n\t\t\t\"type\": \"string\"\n\t\t}\n\t}\n}",
                 "options": {}
@@ -250,7 +250,7 @@
         },
         {
             "parameters": {
-                "model": "openrouter/auto",
+                "model": "google/gemini-2.5-flash",
                 "options": {}
             },
             "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
@@ -263,8 +263,8 @@
             "name": "OpenRouter Extractor Model",
             "credentials": {
                 "openRouterApi": {
-                    "id": "rmNQ4AKEUVzOlaJT",
-                    "name": "OpenRouter Account"
+                    "id": "UEu6Xyts6n8Ao9pw",
+                    "name": "OpenRouter Private"
                 }
             }
         },
@@ -368,30 +368,44 @@
         },
         {
             "parameters": {
-                "mode": "raw",
-                "jsonOutput": "{\n  \"ALGOLIA_INDEX_NAME\": \"\"\n}\n",
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "a52dadab-5394-4a9d-a6dc-1da4d3a4dd23",
+                            "name": "ALGOLIA_INDEX_NAME",
+                            "value": "",
+                            "type": "string"
+                        },
+                        {
+                            "id": "496617e6-c383-4c14-b121-71c0c1826031",
+                            "name": "=HTTP_METHOD",
+                            "value": "={{ $prevNode.outputIndex === 0 ? \"POST\" : ($prevNode.outputIndex === 1 ? \"DELETE\" : \"\") }}",
+                            "type": "string"
+                        }
+                    ]
+                },
                 "options": {}
             },
             "type": "n8n-nodes-base.set",
             "typeVersion": 3.4,
             "position": [
-                -1840,
-                576
+                -1824,
+                560
             ],
             "id": "2d3e3555-4b2a-4ad6-bf10-829678d22b19",
             "name": "Workflow Variables"
         },
         {
             "parameters": {
-                "content": "## Workflow Variables \nUse this node to set variables within the workflow as global variables are only available on Paid Plans.",
-                "height": 336,
+                "content": "## Workflow Variables \nUse this node to define variables that can be accessed throughout the workflow.\nSince global variables are only available on paid plans, this provides a way to simulate global values within a single workflow.",
+                "height": 592,
                 "width": 432,
                 "color": 3
             },
             "type": "n8n-nodes-base.stickyNote",
             "position": [
-                -1968,
-                448
+                -1984,
+                288
             ],
             "typeVersion": 1,
             "id": "706e5479-d85d-4a33-a9e0-c746b063d099",
@@ -399,83 +413,103 @@
         },
         {
             "parameters": {
-                "content": "## Entry Point",
-                "height": 224,
-                "width": 288,
+                "content": "## Entry Point\nMarks the initial trigger for the workflow. All logic flows from this node.",
+                "height": 592,
+                "width": 432,
                 "color": 4
             },
             "type": "n8n-nodes-base.stickyNote",
             "position": [
-                -1296,
-                480
+                -2448,
+                288
             ],
             "typeVersion": 1,
             "id": "3f6c72fc-54a3-4873-abb3-36b0a92bf1f3",
             "name": "Sticky Note4"
+        },
+        {
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.HTTP_METHOD }}",
+                                        "rightValue": "POST",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        },
+                                        "id": "26421109-3d52-49c7-bc4c-cac1531cb1cb"
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "POST"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "bc8602a7-b69d-4403-b711-dc8aa8a44b7c",
+                                        "leftValue": "={{ $json.HTTP_METHOD }}",
+                                        "rightValue": "DELETE",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals",
+                                            "name": "filter.operator.equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "DELETE"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3.2,
+            "position": [
+                -1344,
+                560
+            ],
+            "id": "e3fccd56-bd76-4e79-b724-e69b0c4b7615",
+            "name": "Switch"
+        },
+        {
+            "parameters": {
+                "content": "## Workflow Router \nThis switch node routes the execution to the appropriate node based on the HTTP method received from the webhook.\n",
+                "height": 592,
+                "width": 464
+            },
+            "type": "n8n-nodes-base.stickyNote",
+            "position": [
+                -1520,
+                288
+            ],
+            "typeVersion": 1,
+            "id": "80d3214b-f82c-49e0-97a0-a3bd7aa5e26a",
+            "name": "Sticky Note6"
         }
     ],
-    "pinData": {
-        "Information Extractor": [
-            {
-                "json": {
-                    "output": {
-                        "title": "Export Kubernetes Deployment to YAML",
-                        "type": "command",
-                        "language": "shell",
-                        "tags": [
-                            "kubernetes",
-                            "kubectl",
-                            "deployment",
-                            "yaml",
-                            "cli"
-                        ],
-                        "note": "Exports the YAML configuration of the 'my-ServiceWorker' deployment to a file named myservice.yaml using kubectl."
-                    }
-                }
-            }
-        ],
-        "Code": [
-            {
-                "json": {
-                    "output": {
-                        "objectID": "4fc58ffa-6aca-4c71-8d54-70ccb854d49a",
-                        "content": "kubectl get deployment my-ServiceWorker -o yaml > myservice.yaml",
-                        "createdAt": "2025-07-24T19:54:56.223Z",
-                        "title": "Export Kubernetes Deployment to YAML",
-                        "type": "command",
-                        "language": "shell",
-                        "note": "Exports the YAML configuration of the 'my-ServiceWorker' deployment to a file named myservice.yaml using kubectl.",
-                        "tags": [
-                            "kubernetes",
-                            "kubectl",
-                            "deployment",
-                            "yaml",
-                            "cli"
-                        ]
-                    }
-                }
-            }
-        ],
-        "Insert Agent": [
-            {
-                "json": {
-                    "output": {
-                        "result": true,
-                        "objectId": "4fc58ffa-6aca-4c71-8d54-70ccb854d49a"
-                    }
-                }
-            }
-        ],
-        "Delete Agent": [
-            {
-                "json": {
-                    "output": {
-                        "result": true
-                    }
-                }
-            }
-        ]
-    },
+    "pinData": {},
     "connections": {
         "Code": {
             "main": [
@@ -492,14 +526,14 @@
             "main": [
                 [
                     {
-                        "node": "Information Extractor",
+                        "node": "Workflow Variables",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "Delete Agent",
+                        "node": "Workflow Variables",
                         "type": "main",
                         "index": 0
                     }
@@ -656,10 +690,23 @@
             "main": [
                 [
                     {
+                        "node": "Switch",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Switch": {
+            "main": [
+                [
+                    {
                         "node": "Information Extractor",
                         "type": "main",
                         "index": 0
-                    },
+                    }
+                ],
+                [
                     {
                         "node": "Delete Agent",
                         "type": "main",
@@ -675,7 +722,7 @@
         "timezone": "Asia/Kolkata",
         "callerPolicy": "workflowsFromSameOwner"
     },
-    "versionId": "00c4c936-16b7-4f5a-af6d-cc7cef1b2ac8",
+    "versionId": "d4941b63-789d-4a7f-a507-0c3b5865d646",
     "meta": {
         "templateCredsSetupCompleted": true,
         "instanceId": "7ae0f048f3c691858c5ecb6af492b284818dd71f66163ae8056a2e0909a6934b"
