@@ -59,10 +59,16 @@ Follow the detailed [instructions](https://github.com/bugcacher/devstash-vscode-
 2. Search for `Devstash: Save` command in command palette or press `Ctrl+Alt+S` (Windows/Linux) or `Cmd+Opt+S` (Mac)
 3. Snippet is automatically saved and indexed
 
+<img width="1138" height="161" alt="Screenshot 2025-07-26 at 5 19 12 PM" src="https://github.com/user-attachments/assets/1d872cfa-fda3-4e5a-99ba-ffed2956d1b8" />
+
+
 ### Searching Snippets
 1. Search for `Devstash: Search` command in command palette or press `Ctrl+Alt+D` (Windows/Linux) or `Cmd+Opt+D` (Mac)
 2. Type your search query
 3. Click on snippet to copy to clipboard
+
+   
+<img width="1191" height="609" alt="Screenshot 2025-07-26 at 5 20 21 PM" src="https://github.com/user-attachments/assets/f31e04e2-99a2-4ab2-83a1-1d706d2e5098" />
 
 
 ## Future Roadmap
